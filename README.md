@@ -2,20 +2,30 @@
 
 **NOTE: Hobson is still very much under development and still in the brainstorming phase. Send ideas to @AlSweigart or al@inventwithpython.com**
 
-A GUI toolkit with simple features, take it or leave it. Cross-platform, text-based, pure Python 3.
+A GUI toolkit with simple features, take it or leave it. Cross-platform, built on tkinter, pure Python 3.
 
 "Simple is better than complex. Ugly is better than beautiful."
 
 > I needed a way for beginner programmers to make programs that had graphical user interfaces, not just programs that used print() and input(). But I wanted it to be simple enough that they could get started right away. Making offfline browser apps with Flask is okay, but it still requires teaching HTML, teaching Flask, and dabbling a bit in CSS and JavaScript and maybe Bootstrap. That's way too much runway that needs to be cleared.
 
-> Those old DOS programs were ugly, but their coordinate system was dead simple. It was easy to count the size of things by character boxes. I just needed a GUI for a small program without diving into the documentation of a real GUI toolkit likt tkinter or wxPython. So I designed Hobson after Hobson's Choice: "Take it or leave it." Hobson is very limited in its options and it's ugly, but the ugliness works in its favor: it sets expectations that this is a throwaway program.
+> Those old DOS programs were ugly, but their coordinate system was dead simple. It was easy to count the size of things by character boxes. I just needed a GUI for a small program without diving into the documentation of a real GUI toolkit likt tkinter or wxPython. So I designed Hobson after Hobson's Choice: "Take it or leave it." Hobson is very limited in its options and it's ugly, but the ugliness works in its favor: it sets expectations that this is a throwaway program. Hobson's primary benefit is that it is easy to learn.
 
-> Hobson's primary benefit is that it is easy to learn.
+# Design Guidelines
 
+Hobson is very opinionated. Take it or leave it.
 
-TODO - It's designed to support Unicode, so you can use unicode characters so it won't be as bad as DOS. Monospace width only.
-
-TODO - Errors are mostly silenced. Overlapping widget rule.
+* Hobson is mostly defined by what it can't do, rather than what it can. See the FAQ.
+* Hobson only uses monospaced fonts.
+* Hobson windows cannot be resized.
+* Hobson widgets cannot overlap each other; you can't have text boxes that contain buttons.
+* Hobson is for Python 3 only.
+* Hobson is built on top of tkinter for cross-platform compatibility.
+* Hobson menus are tkinter menus, though Hobson has a simplified API.
+* Modal dialogs appear as separate tkinter windows using [PyMsgBox](https://github.com/asweigart/pymsgbox).
+* Hobson cannot display images, but unlike DOS it can display unicode characters.
+* Hobson fits into one file, hobson.py, so that it is easy to distribute.
+* Hobson is meant for throwaway or personal programs that need a GUI.
+* If you are using Hobson for commercial or professional software, you are doing something wrong.
 
 # Install Hobson
 
@@ -140,3 +150,58 @@ This is the entire program:
     win.button(0, 3, 10, 5, 'Convert\nto F°', click=convertCtoF)
 
     win.runloop()
+
+
+# FAQ
+
+**Will the answer to these FAQs ever be anything besides "no"?**
+
+No. Although sometimes there will additional information following the "no".
+
+**Can I resize the HobsonPy window after creating it?**
+
+No. This is so that the widgets don't have to be responsive to window resizes.
+
+**Can I resize the font after creating the window?**
+
+No. Al Sweigart could be persuaded to add this as a feature, but he can't think of a good use case for it.
+
+**Is there support for variable-width fonts like Helvetica?**
+
+No.
+
+**Can I use a custom font?**
+
+No. Courier (Tkinter's default monospace) is used for maximum unicode compatibility and because it is monospaced.
+
+**Can widgets overlap and have parent-child relationships, like a textbox that contains a button?**
+
+No. Flat is better than nested.
+
+**What if I have too many GUI widgets for the window's size? Can I scroll inside the window?**
+
+No. If you need more widgets than the size of the window, your app is too complicated.
+
+**What about systems that have a small screen resolution? Shouldn't windows be scrollable for them?**
+No.
+
+**Is there a menu widget?**
+
+No. Use the actual tkinter menu instead.
+
+**Are there themes for the fg and bg colors?**
+
+No.
+
+**Are there drawing functions for circles, ellipses, and arcs?**
+
+No. Only for lines. HobsonPy is primarily about making simple GUIs, which usually only have lines and rectangles.
+
+**Is there a flood fill drawing function?**
+
+No.
+
+**Is there a drawing function for a filled in polygon?**
+
+No.
+
