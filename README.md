@@ -28,7 +28,7 @@ You can also simply copy `hobson.py` to your program's folder and import it. Hob
 Let's create a fahrenheit and celsius temperature converter. It'll have two text boxes for entering and displaying the temperature in F and C, as well as two buttons to convert both ways. It'll look like this:
 
 
-![alt text](https://github.com/asweigart/hobson/tempconvert.png "Temp Convert Program")
+![Screenshot of Temp Convert program](https://github.com/asweigart/hobson/blob/master/tempconvert.png "Temp Convert Program")
 
 The GUI uses "DOS box drawing" characters:
 
