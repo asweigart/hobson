@@ -99,6 +99,9 @@ We already have the minimize and close buttons added for free from tkinter. (Hob
 
 The `Menu` object accepts a list of menu items. Each menu item is a list of a label string (with `_` before a letter to make it a menu hotkey), a function to call, and optionally another string detailing the keyboard shortcut. If you want submenus under the menu item, use a dictionary where the key is the label and the value is a list of these menu item lists.
 
+Finally, we begin the "application loop" as the last action (similar to tkinter's `runloop()`):
+
+    win.runloop()
 
 This is the entire program:
 
@@ -135,3 +138,5 @@ This is the entire program:
 
     win.button(0, 3, 10, 5, 'Convert\nto C°', click=convertFtoC)
     win.button(0, 3, 10, 5, 'Convert\nto F°', click=convertCtoF)
+
+    win.runloop()
