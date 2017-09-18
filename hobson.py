@@ -290,10 +290,10 @@ class Window:
         elif type(value[0]) != str:
             raise ValueError('{%s} first item in tuple values must be str' % (type(self).__name__))
 
+        # Unfortunately, I can't think of a good way to update the char, fg, and bg all at once without doing the redraw three times.
         self.cells[index].char = value[0]
         self.cells[index].fg = hex_color(value[1])
         self.cells[index].bg = hex_color(value[2])
-        self.cells[index]._redraw()
 
 
     def __getattr__(self, name):
@@ -360,10 +360,7 @@ class Window:
 
         for x, y in get_line_points(startx, starty, endx, endy):
             if 0 < x <= _viewport_width and 0 < y <= _viewport_height:
-                self[x, y].char = char
-                self[x, y].fg = fg
-                self[x, y].bg = bg
-
+                self[x, y] = (char, fg, bg)
 
 
     def draw_rect(self, left, top, width, height, char='*', fg=None, bg=None, filled=False, _viewport_width=None, _viewport_height=None):
