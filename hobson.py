@@ -322,7 +322,18 @@ class Window:
         return fg, bg
 
 
-    def draw_line(self, startx, starty, endx, endy, char='*', fg=None, bg=None, _viewport_width=None, _viewport_height=None):
+    def screenshot(self):
+        # TODO - have some way of extracting the color information. Maybe html?
+        lines = []
+        for y in range(self.win_height):
+            line = []
+            for x in range(self.win_width):
+                line.append(self[x, y].char)
+            lines.append(''.join(line))
+        return '\n'.join(lines)
+
+
+    def draw_line(self, startx, starty, endx, endy, char='*', fg=None, bg=None, _viewport=None):
         """
         Note that the draw_*() functions only draw to the screen once and will not automatically redraw themselves later.
 
@@ -350,20 +361,20 @@ class Window:
         if len(char) != 1:
             raise ValueError('Parameter `char` must be a single character string.')
 
-        # When drawing on a small subsection of the window, we want to limit
-        if _viewport_width is None:
-            _viewport_width = self.win_width
-        if _viewport_height is None:
-            _viewport_height = self.win_height
+        # The viewport is a subsection of the window that we are limited to drawing to.
+        if _viewport is None:
+            left_edge, top_edge, right_edge, bottom_edge = 0, 0, self.win_width - 1, self.win_height - 1
+        else:
+            left_edge, top_edge, right_edge, bottom_edge = _viewport[0], _viewport[1], _viewport[0] + _viewport[2] - 1, _viewport[1] + _viewport[3] - 1
 
         fg, bg = self.normalize_fg_bg(fg, bg) # normalize fg and bg
 
         for x, y in get_line_points(startx, starty, endx, endy):
-            if 0 < x <= _viewport_width and 0 < y <= _viewport_height:
+            if left_edge <= x <= right_edge and top_edge <= y <= bottom_edge:
                 self[x, y] = (char, fg, bg)
 
 
-    def draw_rect(self, left, top, width, height, char='*', fg=None, bg=None, filled=False, _viewport_width=None, _viewport_height=None):
+    def draw_rect(self, left, top, width, height, char='*', fg=None, bg=None, filled=False, _viewport=None):
         """
         Note that the draw_*() functions only draw to the screen once and will not automatically redraw themselves later.
 
@@ -394,10 +405,31 @@ class Window:
 
         fg, bg = self.normalize_fg_bg(fg, bg)
 
+        # The viewport is a subsection of the window that we are limited to drawing to.
+        if _viewport is None:
+            left_edge, top_edge, right_edge, bottom_edge = 0, 0, self.win_width - 1, self.win_height - 1
+        else:
+            left_edge, top_edge, right_edge, bottom_edge = _viewport[0], _viewport[1], _viewport[0] + _viewport[2] - 1, _viewport[1] + _viewport[3] - 1
 
-        pass
+        if filled: # draw a filled in rectangle
+            for x in range(left, left + width):
+                for y in range(top, top + height):
+                    self[x, y] = char, fg, bg
+        else: # draw just the outline of the rectangle
+            for x in range(left, left + width):
+                if left_edge <= x <= right_edge and top_edge <= top <= bottom_edge:
+                    self[x, top] = (char, fg, bg)
+                if left_edge <= x <= right_edge and top_edge <= top + height - 1 <= bottom_edge:
+                    self[x, top + height - 1] = (char, fg, bg)
+            for y in range(top, top + height):
+                if left_edge <= left <= right_edge and top_edge <= y <= bottom_edge:
+                    self[left, top] = (char, fg, bg)
+                if left_edge <= left + width - 1 <= right_edge and top_edge <= y <= bottom_edge:
+                    self[left + width - 1, top] = (char, fg, bg)
 
-    def draw_fill(self, char=' ', fg=None, bg=None, _viewport_width=None, _viewport_height=None):
+
+
+    def draw_fill(self, char=' ', fg=None, bg=None, _viewport=None):
         """
         Note that the draw_*() functions only draw to the screen once and will not automatically redraw themselves later.
 
@@ -406,10 +438,10 @@ class Window:
         Can I just fill in part of the window?
         No. Use draw_rect() with filled=True to do that.
         """
-        self.draw_rect((0, 0), self.width, self.height, ' ', fg, bg, True)
+        self.draw_rect(0, 0, self.win_width - 1, self.win_height - 1, char, fg, bg, True)
 
 
-    def draw_box(self, left, top, width, height, title='', fg=None, bg=None, border=SINGLE, _viewport_width=None, _viewport_height=None):
+    def draw_box(self, left, top, width, height, title='', fg=None, bg=None, border=SINGLE, _viewport=None):
         """Adjusts characters for proper box drawing based on neighboring cells. Can have title.
 
         Note that draw_box()'s `border` parameter cannot be None.'
@@ -451,7 +483,7 @@ class Window:
         pass
 
 
-    def write(self, left, top, text, fg=None, bg=None, _viewport_width=None, _viewport_height=None):
+    def write(self, left, top, text, fg=None, bg=None, _viewport=None):
         """
         Draws text onto the window. The `text` argument can contain TODOself.cells[left + col_num, top + line_num].char = char
         Note that any newline characters cause the cursor to move back to left position of `left`, not to the left edge of the window. Text does not wrap when it reaches the right edge of the window, but rather is truncated.
