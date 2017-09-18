@@ -74,7 +74,7 @@ def hex_color(color):
 
 
 # from http://www.roguebasin.com/index.php?title=Bresenham%27s_Line_Algorithm#Python
-def getLine(x1, y1, x2, y2):
+def get_line_points(x1, y1, x2, y2):
     """Returns a list of (x, y) tuples of every point on a line between
     (x1, y1) and (x2, y2). The x and y values inside the tuple are integers.
 
@@ -270,9 +270,30 @@ class Window:
             raise ValueError('{%s} first item in tuple indices must be int' % (type(self).__name__))
         elif type(index[1]) != int:
             raise ValueError('{%s} second item in tuple indices must be int' % (type(self).__name__))
-        else:
-            #logging.debug(self.cells[index].x, self.cells[index].y, self.cells[index].char)
-            return self.cells[index]
+
+        #logging.debug(self.cells[index].x, self.cells[index].y, self.cells[index].char)
+        return self.cells[index]
+
+    def __setitem__(self, index, value):
+        if type(index) != tuple:
+            raise TypeError('{%s} indices must be tuples of two ints' % (type(self).__name__))
+        elif len(index) != 2:
+            raise ValueError('{%s} tuple indices must have two ints' % (type(self).__name__))
+        elif type(index[0]) != int:
+            raise ValueError('{%s} first item in tuple indices must be int' % (type(self).__name__))
+        elif type(index[1]) != int:
+            raise ValueError('{%s} second item in tuple indices must be int' % (type(self).__name__))
+        elif type(value) != tuple:
+            raise TypeError('{%s} values must be tuples of str, color, color' % (type(self).__name__))
+        elif len(value) != 3:
+            raise ValueError('{%s} tuple values must have three items' % (type(self).__name__))
+        elif type(value[0]) != str:
+            raise ValueError('{%s} first item in tuple values must be str' % (type(self).__name__))
+
+        self.cells[index].char = value[0]
+        self.cells[index].fg = hex_color(value[1])
+        self.cells[index].bg = hex_color(value[2])
+        self.cells[index]._redraw()
 
 
     def __getattr__(self, name):
@@ -284,7 +305,8 @@ class Window:
         raise AttributeError("AttributeError: '%s' object has no attribute '%s'" % (type(self).__name__, name))
 
 
-    def validate_fg_bg(self, fg, bg):
+
+    def normalize_fg_bg(self, fg, bg):
         """
 
         """
@@ -328,10 +350,20 @@ class Window:
         if len(char) != 1:
             raise ValueError('Parameter `char` must be a single character string.')
 
-        fg, bg = self.validate_fg_bg(fg, bg)
+        # When drawing on a small subsection of the window, we want to limit
+        if _viewport_width is None:
+            _viewport_width = self.win_width
+        if _viewport_height is None:
+            _viewport_height = self.win_height
 
+        fg, bg = self.normalize_fg_bg(fg, bg) # normalize fg and bg
 
-        pass
+        for x, y in get_line_points(startx, starty, endx, endy):
+            if 0 < x <= _viewport_width and 0 < y <= _viewport_height:
+                self[x, y].char = char
+                self[x, y].fg = fg
+                self[x, y].bg = bg
+
 
 
     def draw_rect(self, left, top, width, height, char='*', fg=None, bg=None, filled=False, _viewport_width=None, _viewport_height=None):
@@ -363,7 +395,7 @@ class Window:
         if len(char) != 1:
             raise ValueError('Parameter `char` must be a single character string.')
 
-        fg, bg = self.validate_fg_bg(fg, bg)
+        fg, bg = self.normalize_fg_bg(fg, bg)
 
 
         pass
@@ -417,7 +449,7 @@ class Window:
         if len(border) != 1 and border not in (SINGLE, DOUBLE):
             raise ValueError('Parameter `border` must be hobson.SINGLE, hobson.DOUBLE, or a single character str.')
 
-        fg, bg = self.validate_fg_bg(fg, bg)
+        fg, bg = self.normalize_fg_bg(fg, bg)
 
         pass
 
@@ -435,7 +467,7 @@ class Window:
 
         text = str(text)
 
-        fg, bg = self.validate_fg_bg(fg, bg)
+        fg, bg = self.normalize_fg_bg(fg, bg)
 
 
         # TODO - if we try to write anything on a cell that is covered by a widget, then simply don't write it.
@@ -497,7 +529,6 @@ class _Cell:
 
 
     def __setattr__(self, name, value):
-
         if name in ('char', 'fg', 'bg'):
             # TODO - Check to see if the window needs updating.
             char_needs_updating = (name == 'char' and self.char != value) or \
@@ -512,32 +543,27 @@ class _Cell:
 
             # Update the tk Text widget's contents
             if char_needs_updating:
-                self.win._tk_text.configure(state='normal') # set Text widget to editable
-                self.win._tk_text.delete(self._start_index, self._end_index)
-                self.win._tk_text.insert(self._start_index, self.char)
+                self._redraw()
 
-                # Deleting the character from the tk Text widget will require repainting the fg and bg colors, so:
-                self.win._tk_text.tag_add(self._tagname, self._start_index, self._end_index) # the tag has to be re-added after the character was deleted, too
-                self.win._tk_text.tag_config(self._tagname, background=self.bg, foreground=self.fg) # set the fg and bg colors
-
-                self.win._tk_text.configure(state='disable') # set Text widget back to read-only
 
         elif name in ('click', 'dblclick', 'mouseover', 'mouseout', 'mousedown', 'mouseup', 'contextmenu', 'focus', 'blur'):
             # TODO - does the window have to be updated for callbacks?
             super(_Cell, self).__setattr__(name, value)
         else:
             super(_Cell, self).__setattr__(name, value)
-        '''
-        super(_Cell, self).__setattr__(name, value)
 
+
+    def _redraw(self):
+        logging.debug('Redrawing cell %s, %s' % (self.x, self.y))
+        self.win._tk_text.configure(state='normal') # set Text widget to editable
         self.win._tk_text.delete(self._start_index, self._end_index)
         self.win._tk_text.insert(self._start_index, self.char)
 
-        self._tagname = 't%sx%s' % (self.x, self.y)
-        self.win._tk_text.tag_add(self._tagname, self._start_index, self._end_index)
-        self.win._tk_text.tag_config(self._tagname, background=self.bg, foreground=self.fg)
-        '''
+        # Deleting the character from the tk Text widget will require repainting the fg and bg colors, so:
+        self.win._tk_text.tag_add(self._tagname, self._start_index, self._end_index) # the tag has to be re-added after the character was deleted, too
+        self.win._tk_text.tag_config(self._tagname, background=self.bg, foreground=self.fg) # set the fg and bg colors
 
+        self.win._tk_text.configure(state='disable') # set Text widget back to read-only
 
 
 class Widget:
