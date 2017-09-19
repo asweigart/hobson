@@ -6,6 +6,7 @@ import tkinter as tk
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.disable(logging.CRITICAL)
 
 __version__ = '0.0.1'
 
@@ -193,7 +194,7 @@ class Window:
     Is there a drawing function for a filled in polygon?
     No.
     """
-    def __init__(self, width=80, height=24, title='', fg=DEFAULT_FG, bg=DEFAULT_BG, font_size=10, menu=None):
+    def __init__(self, width=80, height=25, title='', fg=DEFAULT_FG, bg=DEFAULT_BG, font_size=10, menu=None):
         """
 
         """
@@ -225,9 +226,6 @@ class Window:
         if font_size <= 0:
             raise ValueError('Parameter `font_size` must be greater than 0, not %s.' % (font_size))
 
-        self._widgets = {} # contains all the widgets added to the Window. This is used to check for overlapping widgets.
-        self.cells = {} # contains win_width * win_height cells for each position in the Window.
-
         if menu is not None:
             pass # TODO - create the menu
 
@@ -239,61 +237,71 @@ class Window:
         self._tk_win.resizable(False, False) # disable resizing of the window
 
         self._tk_text = tk.Text(self._tk_win, height=self.win_height, width=self.win_width, font=('Courier', self.font_size))
-
-        initial_text = (((' ' * self.win_width) + '\n') * self.win_height)[:-1] # trim the last newline
-        self._tk_text.insert('1.0', initial_text)
         self._tk_text.pack()
         self._tk_text.configure(state='disabled') # make the tk text widget read-only
 
+        # If this is the first Hobson window created, set _root_win to it.
         if _root_win is None:
             _root_win = self._tk_win
             self._is_root = True
 
+        # Populate the cells of this window.
+        self._widgets = {} # contains all the widgets added to the Window. This is used to check for overlapping widgets.
+        self._char_cells = {} # keys are (x, y) tuples, values are single char strings
+        self._fg_cells = {} # keys are (x, y) tuples, values are '#ffffff' strings
+        self._bg_cells = {} # keys are (x, y) tuples, values are '#ffffff' strings
+        # Note: event handler assignments are assigned to rectangles since widgets are what handle events
 
-        # Create the cells for this window.
         for x in range(self.win_width):
             for y in range(self.win_height):
-                self.cells[x, y] = _Cell(self, x, y)
+                self._char_cells[x, y] = '.'
+                self._fg_cells[x, y] = DEFAULT_FG
+                self._bg_cells[x, y] = DEFAULT_BG
+        self.redraw()
 
+    def redraw(self):
+        self._tk_text.configure(state='normal') # make the tk text widget editable
+
+        self._tk_text.delete('1.0', '%s.%s' % (self.win_height + 1, self.win_width + 1)) # +1 to height because it is 1-based, +1 to width because we need to select the index after the last character
+        self._tk_text.insert('1.0', self.screenshot()) # write out the text
+
+        # Remove all the tags for this tkinter text box widget.
+        for tag in self._tk_text.tag_names():
+            self._tk_text.tag_delete(tag)
+
+        # Note about the variable names here. I use "x" and "y" as 0-based coordinates for the indexes for self._*_cells.
+        # However, "row" and "col" refer to indexes in the tkinter text widget, where rows are 1-based (though columns are 0-based).
+        # Keep this in mind when using row/col for self._*_cells or x/y for the text widget's indexes.
+        '''
+        # NOTE: THE RUN-PAINTING CODE IS KIND OF BUGGY FOR NOW
+        for row in range(1, self.win_height + 1): # +1 because the row numbers are 1-based
+            start_run_index = 0 # since it's faster to change the fg/bg of a contiguous run of characters with the same fg/bg, we need to track the "runs"
+            # Note that runs are always limited to one row. Runs do not span across rows.
+            run_fg = self._fg_cells[start_run_index, row - 1]
+            run_bg = self._bg_cells[start_run_index, row - 1]
+            end_run_index = start_run_index
+            for col in range(self.win_width):
+                if self._fg_cells[col, row - 1] == run_fg and self._bg_cells[col, row - 1] == run_bg:
+                    end_run_index = col
+                else:
+                    # fg or bg has changed, so the run has ended. Let's paint the run.
+                    tag_name = 'r%sc%s' % (row, col) # Really, the tag name only has to be unique, it doesn't matter what it is.
+                    tag_start_index = '%s.%s' % (row, start_run_index)
+                    tag_end_index = '%s.%s' % (row, end_run_index + 1) # +1 to end_run_index because we need to use the index one past the index we want to repaint
+                    self._tk_text.tag_add(tag_name, tag_start_index, tag_end_index)
+
+                    self._tk_text.tag_config(tag_name, background=run_bg, foreground=run_fg ) # set the fg and bg colors
+                    start_run_index = col + 1 # next run begins on the next index
+                    run_fg = self._fg_cells[start_run_index, row - 1]
+                    run_bg = self._bg_cells[start_run_index, row - 1]
+                    end_run_index = start_run_index
+        '''
+
+        self._tk_text.configure(state='disabled') # make the tk text widget read-only
 
     def mainloop(self):
         if self._is_root:
             _root_win.mainloop()
-
-
-    def __getitem__(self, index):
-        if type(index) != tuple:
-            raise TypeError('{%s} indices must be tuples of two ints' % (type(self).__name__))
-        elif len(index) != 2:
-            raise ValueError('{%s} tuple indices must be have two ints' % (type(self).__name__))
-        elif type(index[0]) != int:
-            raise ValueError('{%s} first item in tuple indices must be int' % (type(self).__name__))
-        elif type(index[1]) != int:
-            raise ValueError('{%s} second item in tuple indices must be int' % (type(self).__name__))
-
-        #logging.debug(self.cells[index].x, self.cells[index].y, self.cells[index].char)
-        return self.cells[index]
-
-    def __setitem__(self, index, value):
-        if type(index) != tuple:
-            raise TypeError('{%s} indices must be tuples of two ints' % (type(self).__name__))
-        elif len(index) != 2:
-            raise ValueError('{%s} tuple indices must have two ints' % (type(self).__name__))
-        elif type(index[0]) != int:
-            raise ValueError('{%s} first item in tuple indices must be int' % (type(self).__name__))
-        elif type(index[1]) != int:
-            raise ValueError('{%s} second item in tuple indices must be int' % (type(self).__name__))
-        elif type(value) != tuple:
-            raise TypeError('{%s} values must be tuples of str, color, color' % (type(self).__name__))
-        elif len(value) != 3:
-            raise ValueError('{%s} tuple values must have three items' % (type(self).__name__))
-        elif type(value[0]) != str:
-            raise ValueError('{%s} first item in tuple values must be str' % (type(self).__name__))
-
-        # Unfortunately, I can't think of a good way to update the char, fg, and bg all at once without doing the redraw three times.
-        self.cells[index].char = value[0]
-        self.cells[index].fg = hex_color(value[1])
-        self.cells[index].bg = hex_color(value[2])
 
 
     def __getattr__(self, name):
@@ -303,7 +311,6 @@ class Window:
             return self._widgets[name]
 
         raise AttributeError("AttributeError: '%s' object has no attribute '%s'" % (type(self).__name__, name))
-
 
 
     def normalize_fg_bg(self, fg, bg):
@@ -328,7 +335,7 @@ class Window:
         for y in range(self.win_height):
             line = []
             for x in range(self.win_width):
-                line.append(self[x, y].char)
+                line.append(self._char_cells[x, y])
             lines.append(''.join(line))
         return '\n'.join(lines)
 
@@ -371,7 +378,11 @@ class Window:
 
         for x, y in get_line_points(startx, starty, endx, endy):
             if left_edge <= x <= right_edge and top_edge <= y <= bottom_edge:
-                self[x, y] = (char, fg, bg)
+                # TODO - you should only be able to draw inside the viewport and not overlapping any widgets' areas.
+                self._char_cells[x, y] = char
+                self._fg_cells[x, y] = fg
+                self._bg_cells[x, y] = bg
+        self.redraw()
 
 
     def draw_rect(self, left, top, width, height, char='*', fg=None, bg=None, filled=False, _viewport=None):
@@ -414,19 +425,32 @@ class Window:
         if filled: # draw a filled in rectangle
             for x in range(left, left + width):
                 for y in range(top, top + height):
-                    self[x, y] = char, fg, bg
+                    self._char_cells[x, y] = char
+                    self._fg_cells[x, y] = fg
+                    self._bg_cells[x, y] = bg
+
         else: # draw just the outline of the rectangle
             for x in range(left, left + width):
                 if left_edge <= x <= right_edge and top_edge <= top <= bottom_edge:
-                    self[x, top] = (char, fg, bg)
+                    self._char_cells[x, top] = char
+                    self._fg_cells[x, top] = fg
+                    self._bg_cells[x, top] = bg
                 if left_edge <= x <= right_edge and top_edge <= top + height - 1 <= bottom_edge:
-                    self[x, top + height - 1] = (char, fg, bg)
+                    self._char_cells[x, top + height - 1] = char
+                    self._fg_cells[x, top + height - 1] = fg
+                    self._bg_cells[x, top + height - 1] = bg
+
             for y in range(top, top + height):
                 if left_edge <= left <= right_edge and top_edge <= y <= bottom_edge:
-                    self[left, top] = (char, fg, bg)
+                    self._char_cells[left, y] = char
+                    self._fg_cells[left, y] = fg
+                    self._bg_cells[left, y] = bg
                 if left_edge <= left + width - 1 <= right_edge and top_edge <= y <= bottom_edge:
-                    self[left + width - 1, top] = (char, fg, bg)
+                    self._char_cells[left + width - 1, y] = char
+                    self._fg_cells[left + width - 1, y] = fg
+                    self._bg_cells[left + width - 1, y] = bg
 
+        self.redraw()
 
 
     def draw_fill(self, char=' ', fg=None, bg=None, _viewport=None):
@@ -438,7 +462,7 @@ class Window:
         Can I just fill in part of the window?
         No. Use draw_rect() with filled=True to do that.
         """
-        self.draw_rect(0, 0, self.win_width - 1, self.win_height - 1, char, fg, bg, True)
+        self.draw_rect(0, 0, self.win_width, self.win_height, char, fg, bg, True)
 
 
     def draw_box(self, left, top, width, height, title='', fg=None, bg=None, border=SINGLE, _viewport=None):
@@ -511,88 +535,10 @@ class Window:
                 line = line[:self.win_width - len(line)] # If the text goes past the right edge, truncate it.
 
             for col_num, char in enumerate(line):
-                self.cells[left + col_num, top + line_num].char = char
-                self.cells[left + col_num, top + line_num].fg = fg
-                self.cells[left + col_num, top + line_num].bg = bg
+                self._char_cells[left + col_num, top + line_num] = char
+                self._fg_cells[left + col_num, top + line_num] = fg
+                self._bg_cells[left + col_num, top + line_num] = bg
 
-
-
-class _Cell:
-    """
-    You are never supposed to create these objects yourself.
-    """
-    def __init__(self, win, x, y, char=' ', fg=DEFAULT_FG, bg=DEFAULT_BG, click=None,
-                 dblclick=None, mouseover=None, mouseout=None, mousedown=None,
-                 mouseup=None, contextmenu=None, focus=None, blur=None):
-
-        # TODO: Is it bad to couple the _Cell objects back to their Window object like this?:
-        self.win = win
-        self.x = x
-        self.y = y
-
-        fg = hex_color(fg)
-        bg = hex_color(bg)
-
-        # Set the attributes this way so they don't trigger the "check to see if the window needs updating" code.
-        for name, value in (('char', char), ('fg', fg), ('bg', bg),
-            ('click', click), ('dblclick', dblclick), ('mouseover', mouseover),
-            ('mouseout', mouseout), ('mousedown', mousedown),
-            ('mouseup', mouseup), ('contextmenu', contextmenu),
-            ('focus', focus), ('blur', blur)):
-                super(_Cell, self).__setattr__(name, value)
-
-        win._tk_text.configure(state='normal') # make the tk Text widget editable
-
-        # Insert the character into the tk Text widget.
-        self._start_index = '%s.%s' % (y+1, x)
-        self._end_index = '%s.%s' % (y+1, x+1)
-        win._tk_text.delete(self._start_index, self._end_index)
-        win._tk_text.insert(self._start_index, char)
-
-        # We need to add a tag in the tk Text widget for each _Cell. This tag can't be deleted, or else the fg/bg coloring will go away. We will use the format of "t%sx%s" % (x, y)
-        self._tagname = 't%sx%s' % (x, y)
-        win._tk_text.tag_add(self._tagname, self._start_index, self._end_index)
-        win._tk_text.tag_config(self._tagname, background=bg, foreground=fg) # set the fg and bg colors
-        #win._tk_text.tag_delete(tagname) # DON'T run this, otherwise the fg/bg change on the previous line will be undone
-        win._tk_text.configure(state='disable') # make the tk Text widget read only
-
-
-    def __setattr__(self, name, value):
-        if name in ('char', 'fg', 'bg'):
-            # TODO - Check to see if the window needs updating.
-            char_needs_updating = (name == 'char' and self.char != value) or \
-                                  (name == 'fg' and self.fg != value) or \
-                                  (name == 'bg' and self.bg != value)
-
-            # update the _Cell attributes
-            if name == 'char':
-                super(_Cell, self).__setattr__(name, value)
-            else:
-                super(_Cell, self).__setattr__(name, hex_color(value))
-
-            # Update the tk Text widget's contents
-            if char_needs_updating:
-                self._redraw()
-
-
-        elif name in ('click', 'dblclick', 'mouseover', 'mouseout', 'mousedown', 'mouseup', 'contextmenu', 'focus', 'blur'):
-            # TODO - does the window have to be updated for callbacks?
-            super(_Cell, self).__setattr__(name, value)
-        else:
-            super(_Cell, self).__setattr__(name, value)
-
-
-    def _redraw(self):
-        logging.debug('Redrawing cell %s, %s' % (self.x, self.y))
-        self.win._tk_text.configure(state='normal') # set Text widget to editable
-        self.win._tk_text.delete(self._start_index, self._end_index)
-        self.win._tk_text.insert(self._start_index, self.char)
-
-        # Deleting the character from the tk Text widget will require repainting the fg and bg colors, so:
-        self.win._tk_text.tag_add(self._tagname, self._start_index, self._end_index) # the tag has to be re-added after the character was deleted, too
-        self.win._tk_text.tag_config(self._tagname, background=self.bg, foreground=self.fg) # set the fg and bg colors
-
-        self.win._tk_text.configure(state='disable') # set Text widget back to read-only
 
 
 class Widget:
@@ -669,7 +615,7 @@ class Textbox(Widget):
     def print(self, *objects, sep=' ', end='\n'):
         pass
 
-    def get_screenshot(self):
+    def screenshot(self):
         pass
 
 class Link(Textbox):
