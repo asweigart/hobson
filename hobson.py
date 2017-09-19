@@ -91,11 +91,11 @@ def get_line_points(x1, y1, x2, y2):
       [(x1, y1), (x2, y2), (x3, y3), ...]
 
     Example:
-    >>> getLine(0, 0, 6, 6)
+    >>> get_line_points(0, 0, 6, 6)
     [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6)]
-    >>> getLine(0, 0, 3, 6)
+    >>> get_line_points(0, 0, 3, 6)
     [(0, 0), (0, 1), (1, 2), (1, 3), (2, 4), (2, 5), (3, 6)]
-    >>> getLine(3, 3, -3, -3)
+    >>> get_line_points(3, 3, -3, -3)
     [(3, 3), (2, 2), (1, 1), (0, 0), (-1, -1), (-2, -2), (-3, -3)]
     """
     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
@@ -131,6 +131,28 @@ def get_line_points(x1, y1, x2, y2):
     if rev:
         points.reverse()
     return points
+
+
+def is_inside(point_x, point_y, area_left, area_top, area_width, area_height):
+    '''
+    Returns True if the point of point_x, point_y is inside the area described.
+
+    >>> is_inside(0, 0, 0, 0, 1, 1)
+    True
+    >>> is_inside(1, 0, 0, 0, 1, 1)
+    False
+    >>> is_inside(0, 1, 0, 0, 1, 1)
+    False
+    >>> is_inside(1, 1, 0, 0, 1, 1)
+    False
+    >>> is_inside(5, 5, 4, 4, 4, 4)
+    True
+    >>> is_inside(8, 8, 4, 4, 4, 4)
+    False
+    >>> is_inside(10, 10, 4, 4, 4, 4)
+    False
+    '''
+    return (area_left <= point_x < area_left + area_width) and (area_top <= point_y < area_top + area_height)
 
 
 class Window:
@@ -254,7 +276,7 @@ class Window:
 
         for x in range(self.win_width):
             for y in range(self.win_height):
-                self._char_cells[x, y] = '.'
+                self._char_cells[x, y] = ' '
                 self._fg_cells[x, y] = DEFAULT_FG
                 self._bg_cells[x, y] = DEFAULT_BG
         self.redraw()
@@ -340,6 +362,9 @@ class Window:
         return '\n'.join(lines)
 
 
+    def in_viewport_and_not_widget_areas(self, x, y, viewport):
+        return is_inside(x, y, *viewport) and not any([is_inside(x, y, *widget.area) for widget in self._widgets.values()])
+
     def draw_line(self, startx, starty, endx, endy, char='*', fg=None, bg=None, _viewport=None):
         """
         Note that the draw_*() functions only draw to the screen once and will not automatically redraw themselves later.
@@ -370,14 +395,12 @@ class Window:
 
         # The viewport is a subsection of the window that we are limited to drawing to.
         if _viewport is None:
-            left_edge, top_edge, right_edge, bottom_edge = 0, 0, self.win_width - 1, self.win_height - 1
-        else:
-            left_edge, top_edge, right_edge, bottom_edge = _viewport[0], _viewport[1], _viewport[0] + _viewport[2] - 1, _viewport[1] + _viewport[3] - 1
+            _viewport = (0, 0, self.win_width, self.win_height)
 
         fg, bg = self.normalize_fg_bg(fg, bg) # normalize fg and bg
 
         for x, y in get_line_points(startx, starty, endx, endy):
-            if left_edge <= x <= right_edge and top_edge <= y <= bottom_edge:
+            if self.in_viewport_and_not_widget_areas(x, y, _viewport):
                 # TODO - you should only be able to draw inside the viewport and not overlapping any widgets' areas.
                 self._char_cells[x, y] = char
                 self._fg_cells[x, y] = fg
@@ -418,34 +441,33 @@ class Window:
 
         # The viewport is a subsection of the window that we are limited to drawing to.
         if _viewport is None:
-            left_edge, top_edge, right_edge, bottom_edge = 0, 0, self.win_width - 1, self.win_height - 1
-        else:
-            left_edge, top_edge, right_edge, bottom_edge = _viewport[0], _viewport[1], _viewport[0] + _viewport[2] - 1, _viewport[1] + _viewport[3] - 1
+            _viewport = (0, 0, self.win_width, self.win_height)
 
         if filled: # draw a filled in rectangle
             for x in range(left, left + width):
                 for y in range(top, top + height):
-                    self._char_cells[x, y] = char
-                    self._fg_cells[x, y] = fg
-                    self._bg_cells[x, y] = bg
+                    if self.in_viewport_and_not_widget_areas(x, y, _viewport):
+                        self._char_cells[x, y] = char
+                        self._fg_cells[x, y] = fg
+                        self._bg_cells[x, y] = bg
 
         else: # draw just the outline of the rectangle
             for x in range(left, left + width):
-                if left_edge <= x <= right_edge and top_edge <= top <= bottom_edge:
+                if self.in_viewport_and_not_widget_areas(x, top, _viewport):
                     self._char_cells[x, top] = char
                     self._fg_cells[x, top] = fg
                     self._bg_cells[x, top] = bg
-                if left_edge <= x <= right_edge and top_edge <= top + height - 1 <= bottom_edge:
+                if self.in_viewport_and_not_widget_areas(x, top + height - 1, _viewport):
                     self._char_cells[x, top + height - 1] = char
                     self._fg_cells[x, top + height - 1] = fg
                     self._bg_cells[x, top + height - 1] = bg
 
             for y in range(top, top + height):
-                if left_edge <= left <= right_edge and top_edge <= y <= bottom_edge:
+                if self.in_viewport_and_not_widget_areas(left, y, _viewport):
                     self._char_cells[left, y] = char
                     self._fg_cells[left, y] = fg
                     self._bg_cells[left, y] = bg
-                if left_edge <= left + width - 1 <= right_edge and top_edge <= y <= bottom_edge:
+                if self.in_viewport_and_not_widget_areas(left + width - 1, y, _viewport):
                     self._char_cells[left + width - 1, y] = char
                     self._fg_cells[left + width - 1, y] = fg
                     self._bg_cells[left + width - 1, y] = bg
@@ -462,7 +484,7 @@ class Window:
         Can I just fill in part of the window?
         No. Use draw_rect() with filled=True to do that.
         """
-        self.draw_rect(0, 0, self.win_width, self.win_height, char, fg, bg, True)
+        self.draw_rect(0, 0, self.win_width, self.win_height, char, fg, bg, True, _viewport)
 
 
     def draw_box(self, left, top, width, height, title='', fg=None, bg=None, border=SINGLE, _viewport=None):
@@ -573,12 +595,9 @@ class Widget:
     Are there any layout or geometry managers for HobsonPy?
     No.
     """
-    top = 0
-    left = 0
+    area = (0, 0, 1, 1) # (left, top, width, height)
     visible = True
     enabled = True
-    width = 1
-    height = 1
     tooltip = '' # Tool tips only appear in the status bar, and only if a status bar exists.
 
 class Button(Widget):

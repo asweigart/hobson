@@ -59,7 +59,7 @@ Create a window, specifying the width, height, and optionally the window title:
 
     win = hobson.Window(80, 25, 'Temp Convert')
 
-The `win` global variable contains a "god object" for our app. This is a programming anti-pattern, but Hobson is made for quick and dirty apps.
+The `win` global variable contains a "god object" for our app. This is a programming anti-pattern, but Hobson is made for quick and dirty apps so this bit of inelegance is ignored.
 
 Next, we'll create the text boxes:
 
@@ -158,7 +158,7 @@ This is the entire program:
 
 No. Although sometimes there will additional information following the "no".
 
-**Can I resize the HobsonPy window after creating it?**
+**Can I resize the Hobson window after creating it?**
 
 No. This is so that the widgets don't have to be responsive to window resizes.
 
@@ -172,17 +172,18 @@ No.
 
 **Can I use a custom font?**
 
-No. Courier (Tkinter's default monospace) is used for maximum unicode compatibility and because it is monospaced.
+No. Courier (Tkinter's default monospace font) is used for maximum unicode compatibility and because it is monospaced.
 
 **Can widgets overlap and have parent-child relationships, like a textbox that contains a button?**
 
-No. Flat is better than nested.
+No. I'm applying "flat is better than nested" here.
 
 **What if I have too many GUI widgets for the window's size? Can I scroll inside the window?**
 
 No. If you need more widgets than the size of the window, your app is too complicated.
 
 **What about systems that have a small screen resolution? Shouldn't windows be scrollable for them?**
+
 No.
 
 **Is there a menu widget?**
@@ -195,7 +196,7 @@ No.
 
 **Are there drawing functions for circles, ellipses, and arcs?**
 
-No. Only for lines. HobsonPy is primarily about making simple GUIs, which usually only have lines and rectangles.
+No. Only for lines. Hobson is primarily about making simple GUIs, which usually only have lines and rectangles.
 
 **Is there a flood fill drawing function?**
 
