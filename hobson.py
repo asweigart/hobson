@@ -272,6 +272,7 @@ class Window:
         self._char_cells = {} # keys are (x, y) tuples, values are single char strings
         self._fg_cells = {} # keys are (x, y) tuples, values are '#ffffff' strings
         self._bg_cells = {} # keys are (x, y) tuples, values are '#ffffff' strings
+        self._box_cells = {} # keys are (x, y) tuples, values are booleans (True if this is a box-containing cell) See draw_box() for details.
         # Note: event handler assignments are assigned to rectangles since widgets are what handle events
 
         for x in range(self.win_width):
@@ -279,9 +280,45 @@ class Window:
                 self._char_cells[x, y] = ' '
                 self._fg_cells[x, y] = DEFAULT_FG
                 self._bg_cells[x, y] = DEFAULT_BG
+                self._box_cells[x, y] = False
         self.redraw()
 
     def redraw(self):
+        # Update the draw_box characters based on self._box_cells.
+        for x in range(self.win_width):
+            for y in range(self.win_height):
+                if self._box_cells[x, y]:
+                    top_neighbor = y != 0 and self._box_cells[x, y - 1]
+                    bottom_neighbor = y != self.win_height - 1 and self._box_cells[x, y + 1]
+                    left_neighbor = x != 0 and self._box_cells[x - 1, y]
+                    right_neightbor = x != self.win_width - 1 and self._box_cells[x + 1, y]
+
+                    if (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, True, True, True):
+                        self._char_cells[x, y] = '╬'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, True, False, False):
+                        self._char_cells[x, y] = '╚'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, False, True, False):
+                        self._char_cells[x, y] = '║'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, False, False, True):
+                        self._char_cells[x, y] = '╝'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (False, True, True, False):
+                        self._char_cells[x, y] = '╔'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (False, True, False, True):
+                        self._char_cells[x, y] = '═'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (False, False, True, True):
+                        self._char_cells[x, y] = '╗'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (False, True, True, True):
+                        self._char_cells[x, y] = '╦'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, False, True, True):
+                        self._char_cells[x, y] = '╣'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, True, False, True):
+                        self._char_cells[x, y] = '╩'
+                    elif (top_neighbor, right_neightbor, bottom_neighbor, left_neighbor) == (True, True, True, False):
+                        self._char_cells[x, y] = '╠'
+                    else:
+                        self._char_cells[x, y] = ' '
+
+        # Update the text in the tkinter text box widget
         self._tk_text.configure(state='normal') # make the tk text widget editable
 
         self._tk_text.delete('1.0', '%s.%s' % (self.win_height + 1, self.win_width + 1)) # +1 to height because it is 1-based, +1 to width because we need to select the index after the last character
@@ -405,6 +442,7 @@ class Window:
                 self._char_cells[x, y] = char
                 self._fg_cells[x, y] = fg
                 self._bg_cells[x, y] = bg
+                self._box_cells[x, y] = False
         self.redraw()
 
 
@@ -450,6 +488,7 @@ class Window:
                         self._char_cells[x, y] = char
                         self._fg_cells[x, y] = fg
                         self._bg_cells[x, y] = bg
+                        self._box_cells[x, y] = False
 
         else: # draw just the outline of the rectangle
             for x in range(left, left + width):
@@ -457,20 +496,24 @@ class Window:
                     self._char_cells[x, top] = char
                     self._fg_cells[x, top] = fg
                     self._bg_cells[x, top] = bg
+                    self._box_cells[x, top] = False
                 if self.in_viewport_and_not_widget_areas(x, top + height - 1, _viewport):
                     self._char_cells[x, top + height - 1] = char
                     self._fg_cells[x, top + height - 1] = fg
                     self._bg_cells[x, top + height - 1] = bg
+                    self._box_cells[x, top + height - 1] = False
 
             for y in range(top, top + height):
                 if self.in_viewport_and_not_widget_areas(left, y, _viewport):
                     self._char_cells[left, y] = char
                     self._fg_cells[left, y] = fg
                     self._bg_cells[left, y] = bg
+                    self._box_cells[left, y] = False
                 if self.in_viewport_and_not_widget_areas(left + width - 1, y, _viewport):
                     self._char_cells[left + width - 1, y] = char
                     self._fg_cells[left + width - 1, y] = fg
                     self._bg_cells[left + width - 1, y] = bg
+                    self._box_cells[left + width - 1, y] = False
 
         self.redraw()
 
@@ -502,6 +545,9 @@ class Window:
         No. Use draw_rect() with filled=True to do that.
         """
 
+        # TODO - we need to keep track of the box titles as well.
+        # TODO - need to implement SINGLE and DOUBLE styles.
+
         if type(left) != int:
             raise TypeError('Parameter `left` must be an int, not %s.' % (type(left)))
         if type(top) != int:
@@ -526,7 +572,31 @@ class Window:
 
         fg, bg = self.normalize_fg_bg(fg, bg)
 
-        pass
+        # The viewport is a subsection of the window that we are limited to drawing to.
+        if _viewport is None:
+            _viewport = (0, 0, self.win_width, self.win_height)
+
+        for x in range(left, left + width):
+            if self.in_viewport_and_not_widget_areas(x, top, _viewport):
+                self._box_cells[x, top] = True
+                self._fg_cells[x, top] = fg
+                self._bg_cells[x, top] = bg
+            if self.in_viewport_and_not_widget_areas(x, top + height - 1, _viewport):
+                self._box_cells[x, top + height - 1] = True
+                self._fg_cells[x, top + height - 1] = fg
+                self._bg_cells[x, top + height - 1] = bg
+
+        for y in range(top, top + height):
+            if self.in_viewport_and_not_widget_areas(left, y, _viewport):
+                self._box_cells[left, y] = True
+                self._fg_cells[left, y] = fg
+                self._bg_cells[left, y] = bg
+            if self.in_viewport_and_not_widget_areas(left + width - 1, y, _viewport):
+                self._box_cells[left + width - 1, y] = True
+                self._fg_cells[left + width - 1, y] = fg
+                self._bg_cells[left + width - 1, y] = bg
+
+        self.redraw()
 
 
     def write(self, left, top, text, fg=None, bg=None, _viewport=None):
@@ -624,11 +694,11 @@ class Textbox(Widget):
     Can a text box have just some text that acts as a clickable HTML link, instead of all of it?
     No.
 
-    Can I control the speed that widgets blink?
+    Can I control the speed that cursor blinks?
     No.
     """
     def __init__(self):
-        self.blink = False # Mwahahaha! Long live <blink>!
+        # TODO - note that the cursor blinking would probably best be done by replacing a single character rather than calling redraw()
         self.cursor = (0, 0)
 
     def print(self, *objects, sep=' ', end='\n'):
